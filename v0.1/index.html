@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>オバキッド捕獲作戦 v0.1.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e9e7f6; --ink:#262241; --sub:#5a5680; --accent:#ff5f9e; --wax:#ffe36e; --panel:#ffffff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#1b1930; --ink:#ecebf7; --sub:#a9a5cf; --panel:#2a2747; }
+}
+:root[data-theme="dark"]{ --bg:#1b1930; --ink:#ecebf7; --sub:#a9a5cf; --panel:#2a2747; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"DotGothic16","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
+  line-height:1.6;
+}
+main{max-width:960px; margin:0 auto; padding:20px 16px 32px}
+h1{font-size:clamp(1.4rem,4vw,2rem); margin:0 0 4px; font-weight:normal; letter-spacing:.04em}
+.lead{margin:0 0 16px; color:var(--sub); font-size:.95rem}
+#frame{
+  border:4px solid var(--ink); border-radius:14px; overflow:hidden;
+  background:#262241; box-shadow:6px 6px 0 var(--accent);
+}
+#game{width:100%; aspect-ratio:4/3}
+#game canvas{display:block}
+.keys{margin:20px 0 0; display:flex; flex-wrap:wrap; gap:8px 20px; font-size:.95rem}
+kbd{
+  font-family:inherit; background:var(--panel); border:2px solid var(--ink);
+  border-radius:6px; padding:0 6px; margin-right:4px;
+}
+.note{color:var(--sub); font-size:.85rem; margin-top:12px}
+.back{color:var(--ink); font-size:.9rem}
+#pad{display:none; margin-top:16px; justify-content:space-between; align-items:center; user-select:none; -webkit-user-select:none; touch-action:none}
+.dpad{display:grid; grid-template-columns:repeat(3,56px); grid-template-rows:repeat(3,56px); gap:4px}
+.btn{
+  background:var(--panel); color:var(--ink); border:3px solid var(--ink); border-radius:12px;
+  font-family:inherit; font-size:1.1rem; display:flex; align-items:center; justify-content:center;
+  touch-action:none;
+}
+.btn.on{background:var(--wax)}
+.acts{display:flex; gap:12px}
+.acts .btn{width:72px; height:72px; border-radius:50%}
+@media (pointer:coarse){ #pad{display:flex} .keys{display:none} }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../">← 版の一覧へ</a>
+  <h1>オバキッド捕獲作戦</h1>
+  <p class="lead">v0.1.0　最初の試作版：ペロッパを捕まえるまで</p>
+  <div id="frame"><div id="game"></div></div>
+
+  <div id="pad">
+    <div class="dpad">
+      <span></span><button class="btn" data-k="up" aria-label="上">▲</button><span></span>
+      <button class="btn" data-k="left" aria-label="左">◀</button><span></span><button class="btn" data-k="right" aria-label="右">▶</button>
+      <span></span><button class="btn" data-k="down" aria-label="下">▼</button><span></span>
+    </div>
+    <div class="acts">
+      <button class="btn" data-k="x">拭く</button>
+      <button class="btn" data-k="z">調べる</button>
+    </div>
+  </div>
+
+  <div class="keys">
+    <span><kbd>←↑↓→</kbd>または<kbd>WASD</kbd>移動</span>
+    <span><kbd>Z</kbd>または<kbd>Space</kbd>話す・調べる・決定</span>
+    <span><kbd>X</kbd>長押しでモップがけ</span>
+  </div>
+  <p class="note">キャラクターや背景はすべて仮の図形です。</p>
+</main>
+
+<script src="../lib/phaser.min.js"></script>
+<script>
+const FONT = '"DotGothic16","Hiragino Kaku Gothic ProN","Meiryo",sans-serif';
+const T = 32; // タイル1マスの大きさ
+
+// ===== マップ =====
+// # 壁 / S 物置 / s 看板 / T 木 / ~ ワックス床 / M マンホール / A,B 住人 / P 主人公
+const MAP = [
+  "####################",
+  "#SS....s...........#",
+  "#SS................#",
+  "#..................#",
+  "#....A........T....#",
+  "#..................#",
+  "#...........~~~~~..#",
+  "#....T.....~~~~~~~.#",
+  "#..........~~~M~~~.#",
+  "#..........~~~~~~~.#",
+  "#...........~~~~~..#",
+  "#..................#",
+  "#.....B..P.........#",
+  "#..................#",
+  "####################"
+];
+// タイル番号：0床 1壁 2物置 3看板 4マンホール 5木
+const TILE = {'#':1,'S':2,'s':3,'M':4,'T':5};
+
+// ===== スマホ用ボタンの状態 =====
+const TOUCH = {up:false,down:false,left:false,right:false,z:false,x:false};
+document.querySelectorAll('#pad .btn').forEach(b=>{
+  const k=b.dataset.k;
+  const on=e=>{e.preventDefault(); TOUCH[k]=true; b.classList.add('on');};
+  const off=e=>{e.preventDefault(); TOUCH[k]=false; b.classList.remove('on');};
+  b.addEventListener('pointerdown',on);
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,off));
+});
+
+function txt(scene,x,y,s,size=16,color='#ffffff'){
+  return scene.add.text(x,y,s,{fontFamily:FONT,fontSize:size+'px',color,resolution:2});
+}
+
+class MainScene extends Phaser.Scene{
+  constructor(){ super('main'); }
+
+  // ---------- 仮素材（図形）を作る ----------
+  makeTextures(){
+    if(this.textures.exists('tiles')) return;
+    const tex=(key,w,h,draw)=>{const g=this.make.graphics({x:0,y:0},false); draw(g); g.generateTexture(key,w,h); g.destroy();};
+    const floor=(g,ox)=>{
+      g.fillStyle(0xd9d0be); g.fillRect(ox,0,T,T);
+      g.fillStyle(0xc8bea9); g.fillRect(ox,0,T,1); g.fillRect(ox,0,1,T);
+      g.fillRect(ox+9,11,2,2); g.fillRect(ox+22,24,2,2);
+    };
+    tex('tiles',T*6,T,g=>{
+      floor(g,0);
+      // 壁
+      g.fillStyle(0x5b5577); g.fillRect(T,0,T,T);
+      g.fillStyle(0x47425f); g.fillRect(T,15,T,2); g.fillRect(T+15,0,2,15); g.fillRect(T+6,17,2,15); g.fillRect(T+24,17,2,15);
+      // 物置
+      g.fillStyle(0x8a5a3c); g.fillRect(T*2,0,T,T);
+      g.fillStyle(0x6e452d); for(let i=0;i<4;i++) g.fillRect(T*2+i*8,0,1,T);
+      // 看板
+      floor(g,T*3);
+      g.fillStyle(0x6e452d); g.fillRect(T*3+14,14,4,16);
+      g.fillStyle(0xf2e3c2); g.fillRect(T*3+4,4,24,14);
+      g.lineStyle(2,0x6e452d); g.strokeRect(T*3+4,4,24,14);
+      // マンホールの下地（本体は別画像）
+      floor(g,T*4);
+      // 木
+      floor(g,T*5);
+      g.fillStyle(0x6e452d); g.fillRect(T*5+13,20,6,10);
+      g.fillStyle(0x4f9a5c); g.fillCircle(T*5+16,14,12);
+      g.fillStyle(0x6fbf78); g.fillCircle(T*5+12,10,5);
+    });
+    tex('manhole',T,T,g=>{
+      g.fillStyle(0x6f6f80); g.fillCircle(16,16,14);
+      g.lineStyle(2,0x4c4c5e); g.strokeCircle(16,16,14); g.strokeCircle(16,16,9);
+      g.fillStyle(0x4c4c5e); g.fillRect(6,15,20,2); g.fillRect(15,6,2,20);
+    });
+    tex('player',24,24,g=>{
+      g.fillStyle(0x262241); g.fillRoundedRect(0,0,24,24,7);
+      g.fillStyle(0x3f7fd9); g.fillRoundedRect(2,2,20,20,6);
+      g.fillStyle(0xffffff); g.fillRect(7,8,3,4); g.fillRect(14,8,3,4);
+    });
+    const npc=(key,col)=>tex(key,24,24,g=>{
+      g.fillStyle(0x262241); g.fillRoundedRect(0,0,24,24,12);
+      g.fillStyle(col); g.fillRoundedRect(2,2,20,20,10);
+      g.fillStyle(0x262241); g.fillRect(7,9,3,3); g.fillRect(14,9,3,3);
+    });
+    npc('npcA',0xf29a52); npc('npcB',0x7fd6a8);
+    tex('pero',30,30,g=>{   // ペロッパの仮キャラ（本物とは無関係のただの丸）
+      g.fillStyle(0x262241); g.fillCircle(15,15,15);
+      g.fillStyle(0xa86be0); g.fillCircle(15,15,13);
+      g.fillStyle(0xffffff); g.fillCircle(10,12,4); g.fillCircle(20,12,4);
+      g.fillStyle(0x262241); g.fillCircle(10,13,2); g.fillCircle(20,13,2);
+      g.fillStyle(0xff7fb0); g.fillRoundedRect(12,19,6,9,3);
+    });
+    tex('mop',20,10,g=>{
+      g.fillStyle(0x8a5a3c); g.fillRect(0,4,12,2);
+      g.fillStyle(0xe8e8f0); g.fillRect(11,0,9,10);
+      g.fillStyle(0xb9b9c8); g.fillRect(11,7,9,3);
+    });
+    tex('dot',6,6,g=>{g.fillStyle(0xffe36e); g.fillCircle(3,3,3);});
+  }
+
+  create(){
+    this.makeTextures();
+    // ゲームの状態（フラグ）
+    this.state='dialog';
+    this.f={heardA:false, heardB:false, hasMop:false, cleared:false, caught:false};
+    this.facing={x:0,y:-1};
+    this.rewaxT=0; this.lastSlip=0; this.wasOnWax=false; this.prevTZ=false;
+
+    // マップ作成
+    const grid=[]; this.wax=[]; this.waxMap={}; this.npcs=[]; let start={x:9,y:12};
+    MAP.forEach((row,y)=>{
+      grid.push([...row].map((c,x)=>{
+        if(c==='~'){const w={x,y,a:1}; this.wax.push(w); this.waxMap[x+','+y]=w;}
+        if(c==='M') this.manholePos={x,y};
+        if(c==='A'||c==='B') this.npcs.push({id:c,x,y});
+        if(c==='P') start={x,y};
+        return TILE[c]??0;
+      }));
+    });
+    this.grid=grid;
+    const map=this.make.tilemap({data:grid,tileWidth:T,tileHeight:T});
+    const ts=map.addTilesetImage('tiles','tiles',T,T,0,0);
+    const layer=map.createLayer(0,ts,0,0);
+    layer.setCollision([1,2,3,4,5]);
+
+    this.waxG=this.add.graphics().setDepth(1);
+    this.tongue=this.add.graphics().setDepth(6);
+    txt(this,T*2,T*2,'物置',14,'#fff3d6').setOrigin(0.5).setDepth(2);
+
+    const mx=this.manholePos.x*T+16, my=this.manholePos.y*T+16;
+    this.peek=this.add.image(mx,my-6,'pero').setDepth(2).setAlpha(0);
+    this.manhole=this.add.image(mx,my,'manhole').setDepth(3);
+
+    // 主人公
+    this.player=this.physics.add.image(start.x*T+16,start.y*T+16,'player').setDepth(5);
+    this.player.body.setSize(22,22);
+    this.player.body.setMaxVelocity(230,230);
+    this.player.setCollideWorldBounds(true);
+    this.physics.add.collider(this.player,layer);
+    this.faceDot=this.add.image(0,0,'dot').setDepth(6);
+    this.mop=this.add.image(0,0,'mop').setDepth(6).setVisible(false);
+
+    // 住人
+    const names={A:'ハナさん',B:'タケル'};
+    this.npcs.forEach(n=>{
+      const s=this.physics.add.staticImage(n.x*T+16,n.y*T+16,n.id==='A'?'npcA':'npcB').setDepth(4);
+      this.physics.add.collider(this.player,s);
+      txt(this,n.x*T+16,n.y*T-6,names[n.id],12,'#262241').setOrigin(0.5,1).setDepth(4);
+    });
+
+    // 入力
+    this.cur=this.input.keyboard.createCursorKeys();
+    this.wasd=this.input.keyboard.addKeys('W,A,S,D');
+    this.kZ=this.input.keyboard.addKey('Z');
+    this.kX=this.input.keyboard.addKey('X');
+    this.kEnter=this.input.keyboard.addKey('ENTER');
+
+    this.buildHud(); this.buildDialog(); this.buildCapture(); this.buildZukan();
+
+    this.say([
+      'ここは、ひかり町の商店街。',
+      '最近、この通りでは転ぶ人が続出しているらしい……。',
+      '町の人に話を聞いてみよう。'
+    ]);
+  }
+
+  // ---------- 画面の部品 ----------
+  buildHud(){
+    this.add.rectangle(0,0,640,T,0x262241,0.88).setOrigin(0).setDepth(10);
+    this.hudL=txt(this,10,7,'',14).setDepth(11);
+    this.hudR=txt(this,630,7,'',14,'#ffe36e').setOrigin(1,0).setDepth(11);
+  }
+  buildDialog(){
+    const c=this.add.container(0,0).setDepth(20);
+    const box=this.add.graphics();
+    box.fillStyle(0x262241,0.95); box.fillRoundedRect(16,360,608,104,10);
+    box.lineStyle(3,0xffffff); box.strokeRoundedRect(16,360,608,104,10);
+    this.dText=txt(this,36,376,'',18).setWordWrapWidth(568,true).setLineSpacing(6);
+    this.dArrow=txt(this,600,440,'▼',14,'#ffe36e').setOrigin(0.5);
+    c.add([box,this.dText,this.dArrow]);
+    this.dlg=c; c.setVisible(false);
+    this.tweens.add({targets:this.dArrow,alpha:0.2,duration:400,yoyo:true,repeat:-1});
+  }
+  buildCapture(){
+    const c=this.add.container(320,230).setDepth(30);
+    const panel=this.add.rectangle(0,0,460,250,0x262241,0.96).setStrokeStyle(4,0xffffff);
+    const title=txt(this,0,-104,'ペロッパが顔を出した！',20,'#ffe36e').setOrigin(0.5);
+    this.cPero=this.add.image(0,-42,'pero').setScale(2.4);
+    this.cHint=txt(this,0,14,'',16).setOrigin(0.5);
+    const bar=this.add.rectangle(-180,62,360,24,0x47425f).setOrigin(0,0.5);
+    this.cZone=this.add.rectangle(-180,62,60,24,0xffe36e).setOrigin(0,0.5);
+    this.cCursor=this.add.rectangle(-180,62,6,36,0xffffff);
+    const help=txt(this,0,100,'白い線が黄色に重なったら Z！',14,'#a9a5cf').setOrigin(0.5);
+    c.add([panel,title,this.cPero,this.cHint,bar,this.cZone,this.cCursor,help]);
+    this.cap=c; c.setVisible(false);
+  }
+  buildZukan(){
+    const c=this.add.container(320,240).setDepth(40);
+    const panel=this.add.rectangle(0,0,540,400,0xfdfbff).setStrokeStyle(6,0x262241);
+    const head=txt(this,0,-170,'オバキッド図鑑に登録された！',20,'#ff5f9e').setOrigin(0.5);
+    const pero=this.add.image(-170,-60,'pero').setScale(3);
+    const info=txt(this,-90,-120,
+      'No.001　ペロッパ（仮）\n分類：ツルリンオバキッド\n出現：ひかり町のマンホール',16,'#262241').setLineSpacing(8);
+    const desc=txt(this,-235,20,
+      'マンホールにひそみ、長い舌でワックスを塗りひろげる。転んだ人を見て、こっそり笑うのが大好き。\n\n捕獲メモ：床のワックスをすべて拭き取られると、たまらず顔を出す。',
+      15,'#262241').setWordWrapWidth(470,true).setLineSpacing(6);
+    const again=txt(this,0,170,'Z でもう一度あそぶ',16,'#5a5680').setOrigin(0.5);
+    c.add([panel,head,pero,info,desc,again]);
+    this.zk=c; c.setVisible(false);
+  }
+
+  // ---------- 会話 ----------
+  say(lines,onDone){
+    this.state='dialog';
+    this.d={lines,i:0,shown:0,onDone};
+    this.dText.setText(''); this.dlg.setVisible(true);
+  }
+  updateDialog(dt,z){
+    const d=this.d, line=d.lines[d.i];
+    if(d.shown<line.length){
+      d.shown=Math.min(line.length,d.shown+dt*45);
+      if(z) d.shown=line.length;
+      this.dText.setText(line.slice(0,Math.floor(d.shown)));
+      this.dArrow.setVisible(false);
+      return;
+    }
+    this.dArrow.setVisible(true);
+    if(!z) return;
+    d.i++; d.shown=0;
+    if(d.i>=d.lines.length){
+      this.dlg.setVisible(false); this.state='explore';
+      if(d.onDone) d.onDone();
+    }
+  }
+
+  // ---------- 調べる・話す ----------
+  interact(){
+    const p=this.player, tx=Math.floor(p.x/T)+this.facing.x, ty=Math.floor(p.y/T)+this.facing.y;
+    const f=this.f;
+    const npc=this.npcs.find(n=>n.x===tx&&n.y===ty);
+    if(npc&&npc.id==='A'){
+      if(f.caught) return this.say(['まあ、床がすっかり元どおり！','これでもう転ばずにすむわ。ありがとう。']);
+      if(f.hasMop) return this.say(['あら、モップ？','拭いても拭いても、いつの間にかまたツルツルになるのよねえ。']);
+      f.heardA=true;
+      return this.say(['この通り、最近みんな転ぶのよ。','床がやけにピカピカで……。','誰が磨いてるのかしら？　夜中に磨いてる人なんて見たことないのに。']);
+    }
+    if(npc&&npc.id==='B'){
+      if(f.caught) return this.say(['本当にいたんだ……オバキッド！','すげえ！　ほかにもいるのかな？']);
+      if(f.hasMop) return this.say(['拭いてたら、マンホールから何か出てくるかも……','ペロッて舌を出してるやつ、ぜったいアイツが犯人だよ！']);
+      f.heardB=true;
+      return this.say(['夜中にさ、マンホールの中から「ペロッ」て音がするんだ。','あのピカピカの床、マンホールのまわりから広がってるんだよ。','そうだ、物置に古いモップがあったはずだよ。']);
+    }
+    const tile=this.grid[ty]?.[tx];
+    if(tile===2){
+      if(f.hasMop) return this.say(['ほこりっぽい物置だ。もう用はない。']);
+      f.hasMop=true;
+      return this.say(['物置の扉を開けた。','すみに古いモップが立てかけてある。','モップを手に入れた！','（ワックスの上で X キーを長押しすると、床を拭けます）']);
+    }
+    if(tile===3) return this.say(['「ひかり町商店街」','「足もとに注意！　すべります」']);
+    if(tile===5) return this.say(['大きな木だ。']);
+    if(tile===4){
+      if(f.caught) return this.say(['マンホールはすっかり静かになった。']);
+      if(f.cleared) return this.startCapture();
+      if(f.hasMop) return this.say(['フタのまわりはワックスでツルツルだ。','まずは床をきれいにしよう。']);
+      return this.say(['マンホールのフタだ。','まわりの床が、とくにピカピカしている……。','なんだか、下から見られている気がする。']);
+    }
+  }
+
+  // ---------- ワックス ----------
+  waxLeft(){ return this.wax.reduce((s,w)=>s+w.a,0)/this.wax.length; }
+  drawWax(time){
+    const g=this.waxG; g.clear();
+    for(const w of this.wax){
+      if(w.a<=0) continue;
+      g.fillStyle(0xfff0a0,0.25+0.5*w.a); g.fillRect(w.x*T,w.y*T,T,T);
+      const ph=(time/450+w.x*1.3+w.y*2.1)%3;
+      if(ph<1&&w.a>0.4){
+        g.fillStyle(0xffffff,(1-ph)*w.a);
+        g.fillRect(w.x*T+6+(w.x*7)%16,w.y*T+5+(w.y*5)%16,4,4);
+      }
+    }
+  }
+  rewax(n){
+    const cand=Phaser.Utils.Array.Shuffle(this.wax.filter(w=>w.a<0.5)).slice(0,n);
+    if(!cand.length) return;
+    const mx=this.manhole.x, my=this.manhole.y;
+    this.tongue.clear(); this.tongue.lineStyle(5,0xff7fb0,1);
+    cand.forEach(w=>{ w.a=1; this.tongue.lineBetween(mx,my,w.x*T+16,w.y*T+16); });
+    this.tongue.setAlpha(1);
+    this.tweens.add({targets:this.tongue,alpha:0,duration:500,delay:150});
+    this.peek.setAlpha(1).setY(my-6);
+    this.tweens.add({targets:this.peek,y:my-22,duration:180,yoyo:true,hold:300,onComplete:()=>this.peek.setAlpha(0)});
+    this.float(mx,my-30,'ペロッ！','#ff7fb0');
+  }
+  checkCleared(){
+    if(this.f.cleared||this.wax.some(w=>w.a>0)) return;
+    this.f.cleared=true;
+    this.jig=this.tweens.add({targets:this.manhole,angle:{from:-7,to:7},duration:80,yoyo:true,repeat:-1});
+    this.say(['床のワックスが、すっかりなくなった！','……マンホールのフタが、カタカタ揺れている。','近づいて調べてみよう。']);
+  }
+  float(x,y,s,color='#ffffff'){
+    const t=txt(this,x,y,s,16,color).setOrigin(0.5).setDepth(15).setStroke('#262241',4);
+    this.tweens.add({targets:t,y:y-24,alpha:0,duration:900,onComplete:()=>t.destroy()});
+  }
+
+  // ---------- 捕獲ミニゲーム ----------
+  startCapture(){
+    this.state='capture'; this.hits=0; this.cPos=0; this.cDir=1; this.cSpeed=0.85;
+    this.newZone(); this.cap.setVisible(true);
+    this.cPero.setScale(2.4);
+  }
+  newZone(){
+    this.zw=0.2-this.hits*0.04;
+    this.zs=Phaser.Math.FloatBetween(0.1,0.9-this.zw);
+    this.cZone.setX(-180+this.zs*360).setSize(this.zw*360,24);
+    this.cHint.setText('あと '+(3-this.hits)+' 回');
+  }
+  updateCapture(dt,z){
+    this.cPos+=this.cDir*this.cSpeed*dt;
+    if(this.cPos>1){this.cPos=1;this.cDir=-1;} if(this.cPos<0){this.cPos=0;this.cDir=1;}
+    this.cCursor.setX(-180+this.cPos*360);
+    if(!z) return;
+    if(this.cPos>=this.zs&&this.cPos<=this.zs+this.zw){
+      this.hits++; this.cSpeed+=0.35;
+      this.cameras.main.flash(90,255,255,255);
+      this.tweens.add({targets:this.cPero,angle:{from:-15,to:15},duration:60,yoyo:true,repeat:2,onComplete:()=>this.cPero.setAngle(0)});
+      if(this.hits>=3){
+        this.cap.setVisible(false);
+        this.f.caught=true; this.jig?.stop(); this.manhole.setAngle(0);
+        this.say(['えいっ！','やった！　ペロッパを捕まえた！'],()=>{this.state='zukan'; this.zk.setVisible(true);});
+      } else this.newZone();
+    } else {
+      this.cap.setVisible(false);
+      this.f.cleared=false; this.jig?.stop(); this.manhole.setAngle(0);
+      this.cameras.main.shake(200,0.01);
+      this.rewax(7);
+      this.say(['ペロロ〜ン！','ペロッパはワックスをまき散らして、マンホールにもぐってしまった！','もう一度、床を拭き取ろう。']);
+    }
+  }
+
+  // ---------- 毎フレームの処理 ----------
+  hud(){
+    const f=this.f; let s;
+    if(f.caught) s='ペロッパを捕まえた！';
+    else if(f.cleared) s='マンホールを調べてみよう';
+    else if(f.hasMop) s='X長押しでワックスを拭き取ろう（残り'+Math.ceil(this.waxLeft()*100)+'%）';
+    else if(f.heardB) s='物置でモップを探そう';
+    else s='町の人に話を聞いてみよう';
+    this.hudL.setText(s);
+    this.hudR.setText(f.hasMop?'持ち物：モップ':'');
+  }
+  update(time,delta){
+    const dt=Math.min(delta,50)/1000;
+    const jz=Phaser.Input.Keyboard.JustDown(this.kZ), js=Phaser.Input.Keyboard.JustDown(this.cur.space),
+          je=Phaser.Input.Keyboard.JustDown(this.kEnter), jt=TOUCH.z&&!this.prevTZ;
+    this.prevTZ=TOUCH.z;
+    const z=jz||js||je||jt;
+    const p=this.player, b=p.body;
+
+    this.drawWax(time); this.hud();
+    this.faceDot.setPosition(p.x+this.facing.x*15,p.y+this.facing.y*15);
+
+    if(this.state!=='explore'){
+      b.setVelocity(0,0); b.setAcceleration(0,0); this.mop.setVisible(false);
+      if(this.state==='dialog') this.updateDialog(dt,z);
+      else if(this.state==='capture') this.updateCapture(dt,z);
+      else if(this.state==='zukan'&&z) this.scene.restart();
+      return;
+    }
+    if(z){ this.interact(); return; }
+
+    const L=this.cur.left.isDown||this.wasd.A.isDown||TOUCH.left, R=this.cur.right.isDown||this.wasd.D.isDown||TOUCH.right;
+    const U=this.cur.up.isDown||this.wasd.W.isDown||TOUCH.up, D=this.cur.down.isDown||this.wasd.S.isDown||TOUCH.down;
+    let dx=(R?1:0)-(L?1:0), dy=(D?1:0)-(U?1:0);
+    if(dx&&dy){dx*=0.7071; dy*=0.7071;}
+    if(dx||dy) this.facing=Math.abs(dx)>=Math.abs(dy)?{x:Math.sign(dx),y:0}:{x:0,y:Math.sign(dy)};
+
+    const w=this.waxMap[Math.floor(p.x/T)+','+Math.floor(p.y/T)];
+    const onWax=!!w&&w.a>0.05;
+    const wiping=this.f.hasMop&&(this.kX.isDown||TOUCH.x);
+
+    if(onWax){
+      if(!this.wasOnWax&&time-this.lastSlip>1500){this.float(p.x,p.y-20,'ツルッ！','#ffe36e'); this.lastSlip=time;}
+      b.setDrag(25,25); b.setBounce(0.55,0.55);
+      const acc=wiping?110:260;
+      b.setAcceleration(dx*acc,dy*acc);
+      if(wiping){
+        const k=Math.pow(0.05,dt); b.velocity.x*=k; b.velocity.y*=k; // モップがブレーキになる
+        w.a=Math.max(0,w.a-dt*2.4);
+        if(w.a<=0.05){w.a=0; this.checkCleared();}
+      }
+    } else {
+      b.setAcceleration(0,0); b.setDrag(0,0); b.setBounce(0,0);
+      const sp=wiping?70:130, k=Math.min(1,dt*16);
+      b.velocity.x+=(dx*sp-b.velocity.x)*k; b.velocity.y+=(dy*sp-b.velocity.y)*k;
+    }
+    this.wasOnWax=onWax;
+
+    if(this.f.hasMop&&!this.f.cleared){
+      this.rewaxT+=dt;
+      if(this.rewaxT>=5.5){this.rewaxT=0; this.rewax(1);}
+    }
+
+    this.mop.setVisible(wiping);
+    if(wiping){
+      this.mop.setPosition(p.x+this.facing.x*16,p.y+this.facing.y*16+4);
+      this.mop.setFlipX(this.facing.x<0);
+      this.mop.setAngle(this.facing.y!==0?90:0);
+      this.mop.setDepth(this.facing.y<0?4:6);
+    }
+  }
+}
+
+const config={
+  type:Phaser.AUTO, parent:'game', width:640, height:480,
+  backgroundColor:'#262241', pixelArt:true,
+  physics:{default:'arcade',arcade:{debug:false}},
+  scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
+  scene:[MainScene]
+};
+const fontReady=document.fonts?Promise.race([document.fonts.load('16px "DotGothic16"'),new Promise(r=>setTimeout(r,1500))]):Promise.resolve();
+fontReady.catch(()=>{}).then(()=>new Phaser.Game(config));
+</script>
+</body>
+</html>

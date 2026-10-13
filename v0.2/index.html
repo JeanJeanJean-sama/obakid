@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>オバキッド捕獲作戦 v0.2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e9e7f6; --ink:#262241; --sub:#5a5680; --accent:#ff5f9e; --wax:#ffe36e; --panel:#ffffff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#1b1930; --ink:#ecebf7; --sub:#a9a5cf; --panel:#2a2747; }
+}
+:root[data-theme="dark"]{ --bg:#1b1930; --ink:#ecebf7; --sub:#a9a5cf; --panel:#2a2747; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"DotGothic16","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
+  line-height:1.6;
+}
+main{max-width:960px; margin:0 auto; padding:20px 16px 32px}
+h1{font-size:clamp(1.4rem,4vw,2rem); margin:0 0 4px; font-weight:normal; letter-spacing:.04em}
+.lead{margin:0 0 16px; color:var(--sub); font-size:.95rem}
+#frame{
+  border:4px solid var(--ink); border-radius:14px; overflow:hidden;
+  background:#262241; box-shadow:6px 6px 0 var(--accent);
+}
+#game{width:100%; aspect-ratio:4/3}
+#game canvas{display:block}
+.keys{margin:20px 0 0; display:flex; flex-wrap:wrap; gap:8px 20px; font-size:.95rem}
+kbd{
+  font-family:inherit; background:var(--panel); border:2px solid var(--ink);
+  border-radius:6px; padding:0 6px; margin-right:4px;
+}
+.note{color:var(--sub); font-size:.85rem; margin-top:12px}
+.back{color:var(--ink); font-size:.9rem}
+#pad{display:none; margin-top:16px; justify-content:space-between; align-items:center; user-select:none; -webkit-user-select:none; touch-action:none}
+.dpad{display:grid; grid-template-columns:repeat(3,56px); grid-template-rows:repeat(3,56px); gap:4px}
+.btn{
+  background:var(--panel); color:var(--ink); border:3px solid var(--ink); border-radius:12px;
+  font-family:inherit; font-size:1.1rem; display:flex; align-items:center; justify-content:center;
+  touch-action:none;
+}
+.btn.on{background:var(--wax)}
+.acts{display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end}
+.acts .btn{width:64px; height:64px; border-radius:50%}
+@media (pointer:coarse){ #pad{display:flex} .keys{display:none} }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../">← 版の一覧へ</a>
+  <h1>オバキッド捕獲作戦</h1>
+  <p class="lead">v0.2.0　ワックスの謎を解いて、ペロッパを捕まえよう</p>
+  <div id="frame"><div id="game"></div></div>
+
+  <div id="pad">
+    <div class="dpad">
+      <span></span><button class="btn" data-k="up" aria-label="上">▲</button><span></span>
+      <button class="btn" data-k="left" aria-label="左">◀</button><span></span><button class="btn" data-k="right" aria-label="右">▶</button>
+      <span></span><button class="btn" data-k="down" aria-label="下">▼</button><span></span>
+    </div>
+    <div class="acts">
+      <button class="btn" data-k="r" style="width:52px;height:52px;font-size:.8rem">戻す</button>
+      <button class="btn" data-k="x">拭く</button>
+      <button class="btn" data-k="c">網</button>
+      <button class="btn" data-k="z">調べる</button>
+    </div>
+  </div>
+
+  <div class="keys">
+    <span><kbd>←↑↓→</kbd>または<kbd>WASD</kbd>移動</span>
+    <span><kbd>Z</kbd>または<kbd>Space</kbd>話す・調べる・決定</span>
+    <span><kbd>X</kbd>モップで拭く</span>
+    <span><kbd>C</kbd>虫取り網を振る</span>
+    <span><kbd>R</kbd>広場をやり直す</span>
+  </div>
+  <p class="note">キャラクターや背景はすべて仮の図形です。あとでドット絵に差し替えます。</p>
+</main>
+
+<script src="../lib/phaser.min.js"></script>
+<script>
+const FONT='"DotGothic16","Hiragino Kaku Gothic ProN","Meiryo",sans-serif';
+const T=32, MOP_MAX=4;
+// # 壁 / S 物置 / s 看板 / T 木 / ~ ワックス / O ワックスだまり / C 木箱(ワックス上)
+// M マンホール / W 水路 / A,B 住人 / P 主人公 / E 広場の入口
+const MAP=[
+"####################",
+"#SS..s..############",
+"#SS.....############",
+"#.......############",
+"#..A....##~~~~~~~W##",
+"#.......##~~~~~O~W##",
+"#.......##T~~~~~~W##",
+"#....P..E.~~M~~~~W##",
+"#.......##~~C~~~~W##",
+"#.......##~O~~~~~W##",
+"#..B....##~~~~~~OW##",
+"#.......############",
+"#.......############",
+"#.......############",
+"####################"];
+const TILE_ID={'.':0,'#':1,'S':2,'s':3,'M':4,'T':5,'W':6};
+const SOLID='#SsTM';
+const DIRS={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}};
+const K=(x,y)=>x+','+y;
+
+const TOUCH={up:false,down:false,left:false,right:false,z:false,x:false,c:false,r:false};
+document.querySelectorAll('#pad .btn').forEach(b=>{
+  const k=b.dataset.k;
+  const on=e=>{e.preventDefault();TOUCH[k]=true;b.classList.add('on');};
+  const off=e=>{e.preventDefault();TOUCH[k]=false;b.classList.remove('on');};
+  b.addEventListener('pointerdown',on);
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,off));
+});
+function txt(s,x,y,str,size=16,color='#ffffff'){
+  return s.add.text(x,y,str,{fontFamily:FONT,fontSize:size+'px',color,resolution:2});
+}
+const cx=t=>t*T+16;
+
+class MainScene extends Phaser.Scene{
+  constructor(){super('main');}
+  init(data){this.keep=data||{};}
+
+  makeTextures(){
+    if(this.textures.exists('tiles')) return;
+    const tex=(key,w,h,draw)=>{const g=this.make.graphics({x:0,y:0},false);draw(g);g.generateTexture(key,w,h);g.destroy();};
+    const floor=(g,o)=>{g.fillStyle(0xd9d0be);g.fillRect(o,0,T,T);g.fillStyle(0xc8bea9);g.fillRect(o,0,T,1);g.fillRect(o,0,1,T);g.fillRect(o+9,11,2,2);g.fillRect(o+22,24,2,2);};
+    tex('tiles',T*7,T,g=>{
+      floor(g,0);
+      g.fillStyle(0x5b5577);g.fillRect(T,0,T,T);
+      g.fillStyle(0x47425f);g.fillRect(T,15,T,2);g.fillRect(T+15,0,2,15);g.fillRect(T+6,17,2,15);g.fillRect(T+24,17,2,15);
+      g.fillStyle(0x8a5a3c);g.fillRect(T*2,0,T,T);g.fillStyle(0x6e452d);for(let i=0;i<4;i++)g.fillRect(T*2+i*8,0,1,T);
+      floor(g,T*3);g.fillStyle(0x6e452d);g.fillRect(T*3+14,14,4,16);g.fillStyle(0xf2e3c2);g.fillRect(T*3+4,4,24,14);g.lineStyle(2,0x6e452d);g.strokeRect(T*3+4,4,24,14);
+      floor(g,T*4);
+      floor(g,T*5);g.fillStyle(0x6e452d);g.fillRect(T*5+13,20,6,10);g.fillStyle(0x4f9a5c);g.fillCircle(T*5+16,14,12);g.fillStyle(0x6fbf78);g.fillCircle(T*5+12,10,5);
+      g.fillStyle(0x3b74c4);g.fillRect(T*6,0,T,T);g.fillStyle(0x6aa3e8);g.fillRect(T*6+4,8,10,2);g.fillRect(T*6+16,20,10,2);g.fillStyle(0x2b5796);g.fillRect(T*6,0,3,T);
+    });
+    tex('manhole',T,T,g=>{g.fillStyle(0x6f6f80);g.fillCircle(16,16,14);g.lineStyle(2,0x4c4c5e);g.strokeCircle(16,16,14);g.strokeCircle(16,16,9);g.fillStyle(0x4c4c5e);g.fillRect(6,15,20,2);g.fillRect(15,6,2,20);});
+    tex('player',24,24,g=>{g.fillStyle(0x262241);g.fillRoundedRect(0,0,24,24,7);g.fillStyle(0x3f7fd9);g.fillRoundedRect(2,2,20,20,6);g.fillStyle(0xffffff);g.fillRect(7,8,3,4);g.fillRect(14,8,3,4);});
+    const npc=(key,col)=>tex(key,24,24,g=>{g.fillStyle(0x262241);g.fillRoundedRect(0,0,24,24,12);g.fillStyle(col);g.fillRoundedRect(2,2,20,20,10);g.fillStyle(0x262241);g.fillRect(7,9,3,3);g.fillRect(14,9,3,3);});
+    npc('npcA',0xf29a52);npc('npcB',0x7fd6a8);
+    tex('pero',30,30,g=>{g.fillStyle(0x262241);g.fillCircle(15,15,15);g.fillStyle(0xa86be0);g.fillCircle(15,15,13);g.fillStyle(0xffffff);g.fillCircle(10,12,4);g.fillCircle(20,12,4);g.fillStyle(0x262241);g.fillCircle(10,13,2);g.fillCircle(20,13,2);g.fillStyle(0xff7fb0);g.fillRoundedRect(12,19,6,9,3);});
+    tex('crate',30,30,g=>{g.fillStyle(0x262241);g.fillRect(0,0,30,30);g.fillStyle(0xb07a45);g.fillRect(2,2,26,26);g.lineStyle(3,0x7a4f28);g.lineBetween(4,4,26,26);g.lineBetween(26,4,4,26);g.strokeRect(3,3,24,24);});
+    tex('mop',20,10,g=>{g.fillStyle(0x8a5a3c);g.fillRect(0,4,12,2);g.fillStyle(0xe8e8f0);g.fillRect(11,0,9,10);g.fillStyle(0xb9b9c8);g.fillRect(11,7,9,3);});
+    tex('net',30,14,g=>{g.fillStyle(0x8a5a3c);g.fillRect(0,6,14,2);g.lineStyle(2,0xffffff);g.strokeCircle(22,7,6);g.lineStyle(1,0xdddddd);g.lineBetween(17,7,27,7);g.lineBetween(22,2,22,12);});
+    tex('dot',6,6,g=>{g.fillStyle(0xffe36e);g.fillCircle(3,3,3);});
+    tex('blob',14,14,g=>{g.fillStyle(0xffd23f);g.fillCircle(7,7,7);g.fillStyle(0xffffff);g.fillCircle(5,5,2);});
+  }
+
+  create(){
+    this.makeTextures();
+    const kp=this.keep;
+    this.f={heardA:!!kp.heardA,heardB:!!kp.heardB,hasMop:!!kp.hasMop,hasNet:!!kp.boss};
+    this.phase=kp.boss?'boss':'town';
+    this.hearts=3; this.mop=MOP_MAX; this.inv=0; this.clock=0; this.spitT=0; this.spits=[];
+    this.busy=false; this.facing=DIRS.up; this.hold=null; this.prevT={};
+    this.trails=new Map(); this.wax=new Set(); this.sources=new Set(); this.npcs=[]; this.crates=[];
+    let start={x:5,y:7};
+    this.base=MAP.map((row,y)=>[...row].map((c,x)=>{
+      if(c==='~'||c==='O'||c==='C'){this.wax.add(K(x,y));}
+      if(c==='O') this.sources.add(K(x,y));
+      if(c==='C') this.crates.push({x,y});
+      if(c==='M') this.mh={x,y};
+      if(c==='A'||c==='B') this.npcs.push({id:c,x,y});
+      if(c==='P') start={x,y};
+      return TILE_ID[c]!==undefined?c:'.';
+    }));
+    if(kp.boss){this.wax.clear();this.sources.clear();this.crates=kp.crates.map(c=>({...c}));start={x:9,y:7};}
+
+    const map=this.make.tilemap({data:this.base.map(r=>r.map(c=>TILE_ID[c])),tileWidth:T,tileHeight:T});
+    map.createLayer(0,map.addTilesetImage('tiles','tiles',T,T,0,0),0,0);
+    this.waxG=this.add.graphics().setDepth(1);
+    this.fxG=this.add.graphics().setDepth(2);
+    txt(this,T*2,T*2,'物置',14,'#fff3d6').setOrigin(0.5).setDepth(2);
+    this.peek=this.add.image(cx(this.mh.x),cx(this.mh.y)-6,'pero').setDepth(2).setAlpha(0);
+    this.manhole=this.add.image(cx(this.mh.x),cx(this.mh.y),'manhole').setDepth(3);
+    this.crates.forEach(c=>c.spr=this.add.image(cx(c.x),cx(c.y),'crate').setDepth(3));
+    const names={A:'ハナさん',B:'タケル'};
+    this.npcs.forEach(n=>{
+      this.add.image(cx(n.x),cx(n.y),n.id==='A'?'npcA':'npcB').setDepth(3);
+      txt(this,cx(n.x),n.y*T-6,names[n.id],12,'#262241').setOrigin(0.5,1).setDepth(3);
+    });
+    this.pt={...start};
+    this.pl=this.add.image(cx(start.x),cx(start.y),'player').setDepth(5);
+    this.faceDot=this.add.image(0,0,'dot').setDepth(6);
+    this.mopS=this.add.image(0,0,'mop').setDepth(6).setVisible(false);
+    this.netS=this.add.image(0,0,'net').setDepth(7).setVisible(false);
+
+    const kb=this.input.keyboard;
+    this.cur=kb.createCursorKeys(); this.wasd=kb.addKeys('W,A,S,D');
+    this.keys={z:kb.addKey('Z'),x:kb.addKey('X'),c:kb.addKey('C'),r:kb.addKey('R'),enter:kb.addKey('ENTER')};
+
+    this.buildHud(); this.buildDialog(); this.buildZukan();
+    this.state='explore';
+    if(kp.boss) this.say(['もう一度、ペロッパに挑戦だ！'],()=>this.spawnBoss());
+    else if(!kp.skipIntro) this.say(['ここは、ひかり町。','最近、マンホール広場で転ぶ人が続出しているらしい……。','町の人に話を聞いてみよう。']);
+  }
+
+  // ===== 画面部品 =====
+  buildHud(){
+    this.add.rectangle(0,0,640,T,0x262241,0.9).setOrigin(0).setDepth(10);
+    this.hudL=txt(this,10,7,'',14).setDepth(11);
+    this.hudR=txt(this,630,7,'',14,'#ffe36e').setOrigin(1,0).setDepth(11);
+  }
+  buildDialog(){
+    const c=this.add.container(0,0).setDepth(20);
+    const g=this.add.graphics();g.fillStyle(0x262241,0.95);g.fillRoundedRect(16,360,608,104,10);g.lineStyle(3,0xffffff);g.strokeRoundedRect(16,360,608,104,10);
+    this.dText=txt(this,36,376,'',18).setWordWrapWidth(568,true).setLineSpacing(6);
+    this.dArrow=txt(this,600,440,'▼',14,'#ffe36e').setOrigin(0.5);
+    c.add([g,this.dText,this.dArrow]);this.dlg=c;c.setVisible(false);
+    this.tweens.add({targets:this.dArrow,alpha:0.2,duration:400,yoyo:true,repeat:-1});
+  }
+  buildZukan(){
+    const c=this.add.container(320,240).setDepth(40);
+    c.add([
+      this.add.rectangle(0,0,540,400,0xfdfbff).setStrokeStyle(6,0x262241),
+      txt(this,0,-170,'オバキッド図鑑に登録された！',20,'#ff5f9e').setOrigin(0.5),
+      this.add.image(-170,-60,'pero').setScale(3),
+      txt(this,-90,-120,'No.001　ペロッパ（仮）\n分類：ツルリンオバキッド\n出現：ひかり町マンホール広場',16,'#262241').setLineSpacing(8),
+      txt(this,-235,20,'マンホールにひそみ、長い舌でワックスを塗りひろげる。ツルツルの体で網をすり抜けるが、突進して壁にぶつかると目を回す。\n\n捕獲メモ：ワックスだまりを全部拭き取ると、怒って飛び出してくる。',15,'#262241').setWordWrapWidth(470,true).setLineSpacing(6),
+      txt(this,0,170,'Z でもう一度あそぶ',16,'#5a5680').setOrigin(0.5)
+    ]);this.zk=c;c.setVisible(false);
+  }
+  float(x,y,s,color='#ffffff'){
+    const t=txt(this,x,y,s,16,color).setOrigin(0.5).setDepth(15).setStroke('#262241',4);
+    this.tweens.add({targets:t,y:y-24,alpha:0,duration:900,onComplete:()=>t.destroy()});
+  }
+
+  // ===== 会話 =====
+  say(lines,onDone){this.state='dialog';this.d={lines,i:0,shown:0,onDone};this.dText.setText('');this.dlg.setVisible(true);}
+  updateDialog(dt,z){
+    const d=this.d,line=d.lines[d.i];
+    if(d.shown<line.length){d.shown=Math.min(line.length,d.shown+dt*45);if(z)d.shown=line.length;this.dText.setText(line.slice(0,Math.floor(d.shown)));this.dArrow.setVisible(false);return;}
+    this.dArrow.setVisible(true);
+    if(!z)return;
+    d.i++;d.shown=0;
+    if(d.i>=d.lines.length){this.dlg.setVisible(false);this.state='explore';if(d.onDone)d.onDone();}
+  }
+
+  // ===== 地形の判定 =====
+  ch(x,y){return (this.base[y]&&this.base[y][x])||'#';}
+  inArena(x,y){return x>=10&&x<=16&&y>=4&&y<=10;}
+  isWax(x,y){const k=K(x,y);return this.wax.has(k)||(this.trails.has(k)&&this.trails.get(k)>this.clock);}
+  crateAt(x,y){return this.crates.find(c=>c.x===x&&c.y===y);}
+  bossAt(x,y){return this.boss&&this.boss.x===x&&this.boss.y===y;}
+  solid(x,y){return SOLID.includes(this.ch(x,y))||this.npcs.some(n=>n.x===x&&n.y===y);}
+  stopper(x,y){return this.solid(x,y)||!!this.crateAt(x,y)||this.bossAt(x,y);}
+  canal(x,y){return this.ch(x,y)==='W';}
+
+  // ===== 移動 =====
+  tryMove(d){
+    const p=this.pt,n={x:p.x+d.x,y:p.y+d.y};
+    if(this.stopper(n.x,n.y)&&!this.crateAt(n.x,n.y))return;
+    if(this.canal(n.x,n.y))return;
+    const cr=this.crateAt(n.x,n.y);
+    if(cr){
+      let c={x:n.x+d.x,y:n.y+d.y};
+      if(this.stopper(c.x,c.y)||this.canal(c.x,c.y))return;
+      let steps=1;
+      while(this.isWax(c.x,c.y)){const m={x:c.x+d.x,y:c.y+d.y};if(this.stopper(m.x,m.y)||this.canal(m.x,m.y))break;c=m;steps++;}
+      cr.x=c.x;cr.y=c.y;
+      this.tweens.add({targets:cr.spr,x:cx(c.x),y:cx(c.y),duration:90+60*steps});
+      if(steps>1)this.float(cx(c.x),cx(c.y)-16,'スーッ','#ffe36e');
+    }
+    this.busy=true;
+    const safe={...p};
+    this.walk(n,130,()=>this.afterStep(d,safe,0));
+  }
+  walk(n,dur,cb){this.pt={x:n.x,y:n.y};this.tweens.add({targets:this.pl,x:cx(n.x),y:cx(n.y),duration:dur,onComplete:cb});}
+  afterStep(d,safe,slid){if(this.isWax(this.pt.x,this.pt.y))this.slide(d,safe,slid);else this.busy=false;}
+  slide(d,safe,slid){
+    const p=this.pt,n={x:p.x+d.x,y:p.y+d.y};
+    if(this.canal(n.x,n.y))return this.fall(n,safe);
+    if(this.stopper(n.x,n.y)){
+      if(slid>0){this.float(this.pl.x,this.pl.y-18,'ゴツン！','#ffffff');this.cameras.main.shake(80,0.004);this.time.delayedCall(250,()=>this.busy=false);}
+      else this.busy=false;
+      return;
+    }
+    if(slid===0)this.float(this.pl.x,this.pl.y-18,'ツルッ！','#ffe36e');
+    this.walk(n,60,()=>this.afterStep(d,safe,slid+1));
+  }
+  fall(n,safe){
+    this.pt={...n};
+    this.tweens.add({targets:this.pl,x:cx(n.x),y:cx(n.y),duration:60,onComplete:()=>{
+      this.float(cx(n.x),cx(n.y)-16,'ドボン！','#9fd0ff');
+      this.tweens.add({targets:this.pl,scale:0,angle:180,duration:300,onComplete:()=>{
+        this.pl.setScale(1).setAngle(0);this.pt={...safe};this.pl.setPosition(cx(safe.x),cx(safe.y));
+        this.damage(1,true);this.time.delayedCall(200,()=>this.busy=false);
+      }});
+    }});
+  }
+  damage(n,force){
+    if(!force&&this.inv>0)return false;
+    this.hearts-=n;this.inv=1.2;this.cameras.main.shake(180,0.01);
+    if(this.hearts<=0)this.faint();
+    return true;
+  }
+  faint(){
+    this.hearts=0;
+    const keep={hasMop:this.f.hasMop,heardA:this.f.heardA,heardB:this.f.heardB,skipIntro:true};
+    if(this.phase==='boss'){keep.boss=true;keep.crates=this.crates.map(c=>({x:c.x,y:c.y}));}
+    this.say(['目を回してしまった……。','（'+(this.phase==='boss'?'ペロッパとの勝負':'広場')+'を最初からやり直します）'],()=>this.scene.restart(keep));
+  }
+  resetRoom(){
+    this.say(['広場を最初の状態に戻した。'],()=>this.scene.restart({hasMop:this.f.hasMop,heardA:this.f.heardA,heardB:this.f.heardB,skipIntro:true}));
+  }
+
+  // ===== モップ =====
+  wipe(){
+    if(!this.f.hasMop)return this.float(this.pl.x,this.pl.y-18,'モップがない','#ffffff');
+    const p=this.pt,f={x:p.x+this.facing.x,y:p.y+this.facing.y};
+    let t=null;
+    if(this.isWax(f.x,f.y)&&!this.crateAt(f.x,f.y))t=f;else if(this.isWax(p.x,p.y))t=p;
+    if(!t)return this.float(this.pl.x,this.pl.y-18,'拭くところがない','#ffffff');
+    const puzzle=this.phase==='town';
+    if(puzzle&&this.mop<=0)return this.say(['モップがワックスでベトベトだ……。もう拭けない。','（R キーで広場をやり直せます）']);
+    this.busy=true;
+    this.mopS.setVisible(true).setPosition(cx(t.x)-4,cx(t.y)+6).setAngle(0);
+    this.tweens.add({targets:this.mopS,x:cx(t.x)+6,duration:80,yoyo:true,repeat:1,onComplete:()=>{
+      this.mopS.setVisible(false);
+      const k=K(t.x,t.y);this.wax.delete(k);this.trails.delete(k);
+      if(puzzle)this.mop--;
+      if(this.sources.has(k)){
+        this.sources.delete(k);
+        this.float(cx(t.x),cx(t.y)-16,'ワックスだまりを拭いた！','#ffe36e');
+        if(this.sources.size===0){this.busy=false;return this.startBoss();}
+      } else this.float(cx(t.x),cx(t.y)-16,'キュッ','#ffffff');
+      if(puzzle&&this.mop===0&&this.sources.size>0)this.float(this.pl.x,this.pl.y-36,'モップがベトベト！','#ff7fb0');
+      this.busy=false;
+    }});
+  }
+
+  // ===== 調べる =====
+  interact(){
+    const p=this.pt,x=p.x+this.facing.x,y=p.y+this.facing.y,f=this.f,ph=this.phase;
+    const n=this.npcs.find(n=>n.x===x&&n.y===y);
+    if(n&&n.id==='A'){
+      if(ph==='done')return this.say(['まあ、床がすっかり元どおり！','これでもう転ばずにすむわ。ありがとう。']);
+      if(ph==='boss')return this.say(['きゃー！ あれがペロッパ？ 気をつけて！']);
+      if(f.hasMop)return this.say(['そのモップ、ワックスを吸うとすぐベトベトになるわよ。','拭けるのは'+MOP_MAX+'回くらいかしら。どこを拭くか、よーく考えてね。','困ったら、看板の前で R キーを押すといいわ。']);
+      f.heardA=true;
+      return this.say(['この通り、最近みんな転ぶのよ。','広場の床がワックスでツルツルでね、一度すべり出すと、何かにぶつかるまで止まらないの。','でも、乾いた床の上なら、ちゃんと止まれるみたいよ。']);
+    }
+    if(n&&n.id==='B'){
+      if(ph==='done')return this.say(['本当にいたんだ……オバキッド！','すげえ！ ほかにもいるのかな？']);
+      if(ph==='boss')return this.say(['突進してきたら、うまくよけて壁にぶつけるんだ！']);
+      if(f.hasMop)return this.say(['木箱は押せるよ。ワックスの上なら、すーっとすべっていくんだ。','止まりたい場所の先に何か置ければ……。','それと、広場の右は水路だから、すべって落ちないようにね！']);
+      f.heardB=true;
+      return this.say(['広場のあちこちに、濃いワックスがたまってる場所が3つあるんだ。','マンホールの中のヤツが、あそこからワックスを出してるんじゃないかな。','全部拭き取ったら、きっと怒って出てくるよ！','そうだ、物置に古いモップがあったはずだよ。']);
+    }
+    const c=this.ch(x,y);
+    if(c==='S'){
+      if(f.hasMop)return this.say(['ほこりっぽい物置だ。もう用はない。']);
+      f.hasMop=true;
+      return this.say(['物置の扉を開けた。','すみに古いモップが立てかけてある。','モップを手に入れた！','（X：目の前のワックスを拭く。目の前に無いときは足元を拭く）','（方向キーを軽く押すと、その場で向きだけ変えられます）']);
+    }
+    if(c==='s')return this.say(['「ひかり町マンホール広場」','「床すべります。水路に注意！」','（R キーで、いつでも広場を最初からやり直せます）']);
+    if(c==='T')return this.say(['大きな木だ。']);
+    if(c==='W')return this.say(['水路だ。すべって落ちたら大変だ。']);
+    if(this.crateAt(x,y))return this.say(['木箱だ。押せば動きそうだ。']);
+    if(c==='M'){
+      if(ph==='town')return this.say(['マンホールのフタだ。','なんだか、下から見られている気がする……。']);
+      return this.say(['マンホールのフタだ。']);
+    }
+  }
+
+  // ===== ペロッパのワックス飛ばし（パズル中の妨害） =====
+  updateSpits(dt){
+    if(this.phase==='town'&&this.f.hasMop&&this.inArena(this.pt.x,this.pt.y)){
+      this.spitT+=dt;
+      if(this.spitT>=4.5){this.spitT=0;this.spit();}
+    }
+    this.fxG.clear();
+    this.spits=this.spits.filter(s=>{
+      s.t-=dt;const r=4+12*(1-s.t/1.1);
+      this.fxG.fillStyle(0x262241,0.35);this.fxG.fillEllipse(cx(s.x),cx(s.y)+6,r*2,r);
+      if(s.t>0)return true;
+      s.spr.destroy();
+      this.float(cx(s.x),cx(s.y)-10,'ベチャッ！','#ffd23f');
+      if(this.pt.x===s.x&&this.pt.y===s.y&&this.damage(1))this.float(this.pl.x,this.pl.y-30,'ワックスを浴びた！','#ff7fb0');
+      return false;
+    });
+  }
+  spit(){
+    const mx=cx(this.mh.x),my=cx(this.mh.y),t={...this.pt};
+    this.peek.setAlpha(1).setY(my-6);
+    this.tweens.add({targets:this.peek,y:my-22,duration:180,yoyo:true,hold:400,onComplete:()=>this.peek.setAlpha(0)});
+    const spr=this.add.image(mx,my-20,'blob').setDepth(8);
+    const sx=mx,sy=my-20,ex=cx(t.x),ey=cx(t.y);
+    this.tweens.addCounter({from:0,to:1,duration:1100,onUpdate:tw=>{const v=tw.getValue();if(!spr.active)return;spr.setPosition(sx+(ex-sx)*v,sy+(ey-sy)*v-Math.sin(v*Math.PI)*90);}});
+    this.spits.push({x:t.x,y:t.y,t:1.1,spr});
+  }
+
+  // ===== ペロッパとの勝負 =====
+  startBoss(){
+    this.phase='boss';
+    this.spits.forEach(s=>s.spr.destroy());this.spits=[];
+    this.say(['最後のワックスだまりを拭き取った！','……マンホールが、ガタガタと揺れだした！','広場のワックスが、みるみる乾いていく……！','「ペロロロロ〜ッ！」','タケル「おーい！ これを使って！」','虫取り網を手に入れた！（C キーで振る）','ペロッパの体はツルツルで、そのままでは網がすべってしまう。','突進してきたところをよけて、壁や木にぶつけよう。目を回したら、網で捕まえるチャンスだ！'],()=>{
+      this.wax.clear();this.f.hasNet=true;this.spawnBoss();
+    });
+  }
+  spawnBoss(){
+    const b={x:this.mh.x+1,y:this.mh.y,hp:3,lv:0,state:'hop',t:0.6,cd:1.5,dir:null};
+    if(this.pt.x===b.x&&this.pt.y===b.y)b.y+=1;
+    b.spr=this.add.image(cx(this.mh.x),cx(this.mh.y),'pero').setDepth(4);
+    this.tweens.add({targets:b.spr,x:cx(b.x),y:cx(b.y),duration:400});
+    this.tweens.add({targets:b.spr,scale:{from:0.3,to:1},duration:400});
+    b.mark=txt(this,0,0,'！',20,'#ff5f9e').setOrigin(0.5).setDepth(9).setStroke('#262241',4).setVisible(false);
+    b.stars=txt(this,0,0,'★　★',14,'#ffe36e').setOrigin(0.5).setDepth(9).setStroke('#262241',3).setVisible(false);
+    this.boss=b;
+  }
+  bossFree(x,y){return this.inArena(x,y)&&!SOLID.includes(this.ch(x,y))&&!this.crateAt(x,y);}
+  trail(x,y){this.trails.set(K(x,y),this.clock+6);}
+  bossMove(x,y,dur){const b=this.boss;this.trail(b.x,b.y);b.x=x;b.y=y;this.tweens.add({targets:b.spr,x:cx(x),y:cx(y),duration:dur});}
+  aligned(){
+    const b=this.boss,p=this.pt;
+    if(!this.inArena(p.x,p.y))return null;
+    let d=null;
+    if(b.x===p.x&&b.y!==p.y)d={x:0,y:Math.sign(p.y-b.y)};
+    else if(b.y===p.y&&b.x!==p.x)d={x:Math.sign(p.x-b.x),y:0};
+    if(!d)return null;
+    let x=b.x+d.x,y=b.y+d.y,dist=1;
+    while(!(x===p.x&&y===p.y)){if(!this.bossFree(x,y))return null;x+=d.x;y+=d.y;dist++;}
+    return dist>=2?d:null;
+  }
+  updateBoss(dt){
+    const b=this.boss;if(!b||this.phase!=='boss')return;
+    b.t-=dt;b.cd-=dt;
+    b.mark.setPosition(b.spr.x,b.spr.y-26).setVisible(b.state==='tele');
+    b.stars.setPosition(b.spr.x+Math.sin(this.clock*8)*4,b.spr.y-24).setVisible(b.state==='dizzy');
+    if(b.state==='wander'){
+      const d=b.cd<=0&&this.aligned();
+      if(d){b.state='tele';b.dir=d;b.t=Math.max(0.35,0.75-0.15*b.lv);
+        this.tweens.add({targets:b.spr,angle:{from:-10,to:10},duration:60,yoyo:true,repeat:Math.floor(b.t/0.12),onComplete:()=>b.spr.setAngle(0)});return;}
+      if(b.t<=0){
+        b.t=Math.max(0.22,0.45-0.08*b.lv);
+        const opts=Object.values(DIRS).map(d=>({x:b.x+d.x,y:b.y+d.y})).filter(n=>this.bossFree(n.x,n.y)&&!(n.x===this.pt.x&&n.y===this.pt.y));
+        if(opts.length){
+          // 6割の確率で、主人公と同じ列・行にそろうように動く
+          const p=this.pt,dx=p.x-b.x,dy=p.y-b.y;
+          let n=Phaser.Utils.Array.GetRandom(opts);
+          if(Math.random()<0.6&&this.inArena(p.x,p.y)){
+            const want=Math.abs(dx)<=Math.abs(dy)?{x:b.x+Math.sign(dx),y:b.y}:{x:b.x,y:b.y+Math.sign(dy)};
+            const hit=opts.find(o=>o.x===want.x&&o.y===want.y);if(hit)n=hit;
+          }
+          this.bossMove(n.x,n.y,150);
+        }
+      }
+    } else if(b.state==='tele'){
+      if(b.t<=0){b.state='dash';b.t=0;}
+    } else if(b.state==='dash'){
+      if(b.t>0)return;
+      b.t=0.05;
+      const n={x:b.x+b.dir.x,y:b.y+b.dir.y};
+      if(n.x===this.pt.x&&n.y===this.pt.y){
+        if(this.damage(1))this.float(this.pl.x,this.pl.y-24,'ドーン！','#ff7fb0');
+        b.state='wander';b.cd=1.8;b.t=0.4;return;
+      }
+      if(!this.bossFree(n.x,n.y)){
+        b.state='dizzy';b.t=Math.max(1.6,2.6-0.3*b.lv);b.spr.setAngle(0);
+        this.cameras.main.shake(150,0.008);this.float(b.spr.x,b.spr.y-20,'ゴチーン！','#ffffff');
+        b.wob=this.tweens.add({targets:b.spr,angle:{from:-20,to:20},duration:200,yoyo:true,repeat:Math.floor(b.t/0.4),onComplete:()=>b.spr.setAngle(0)});
+        return;
+      }
+      this.bossMove(n.x,n.y,45);
+    } else if(b.state==='dizzy'){
+      if(b.t<=0){b.state='wander';b.cd=1.2;b.t=0.3;}
+    } else if(b.state==='hop'){
+      if(b.t<=0){b.state='wander';b.t=0.3;}
+    }
+  }
+  swing(){
+    if(!this.f.hasNet)return;
+    this.busy=true;
+    const f={x:this.pt.x+this.facing.x,y:this.pt.y+this.facing.y};
+    const base=Math.atan2(this.facing.y,this.facing.x)*180/Math.PI;
+    this.netS.setVisible(true).setPosition(cx(this.pt.x)+this.facing.x*14,cx(this.pt.y)+this.facing.y*14).setOrigin(0,0.5).setAngle(base-60);
+    this.tweens.add({targets:this.netS,angle:base+60,duration:160,onComplete:()=>{this.netS.setVisible(false);}});
+    this.time.delayedCall(240,()=>this.busy=false);
+    const b=this.boss;
+    if(!b||this.phase!=='boss'||!this.bossAt(f.x,f.y))return;
+    if(b.state==='dizzy')return this.hitBoss();
+    this.float(b.spr.x,b.spr.y-20,'ツルン！','#ffe36e');
+    const away={x:b.x+this.facing.x,y:b.y+this.facing.y};
+    if(this.bossFree(away.x,away.y)){this.bossMove(away.x,away.y,120);}
+    b.state='hop';b.t=0.4;b.cd=Math.min(b.cd,0.3);
+  }
+  hitBoss(){
+    const b=this.boss;b.hp--;if(b.wob)b.wob.stop();b.spr.setAngle(0);
+    this.cameras.main.flash(100,255,255,255);
+    if(b.hp<=0)return this.caught();
+    this.float(b.spr.x,b.spr.y-24,'スルッ！ 網から抜け出した！','#ff7fb0');
+    const opts=[];
+    for(let y=4;y<=10;y++)for(let x=10;x<=16;x++)if(this.bossFree(x,y)&&Math.abs(x-this.pt.x)+Math.abs(y-this.pt.y)>=4)opts.push({x,y});
+    const n=Phaser.Utils.Array.GetRandom(opts)||{x:b.x,y:b.y};
+    b.x=n.x;b.y=n.y;b.lv++;b.state='hop';b.t=0.6;b.cd=1.0;b.spr.setAngle(0);
+    this.tweens.add({targets:b.spr,x:cx(n.x),y:cx(n.y),duration:450});
+    this.tweens.add({targets:b.spr,scale:1.6,duration:225,yoyo:true});
+  }
+  caught(){
+    const b=this.boss;this.phase='done';b.state='caught';if(b.wob)b.wob.stop();
+    b.mark.setVisible(false);b.stars.setVisible(false);this.trails.clear();
+    this.tweens.add({targets:b.spr,scale:0,angle:360,x:this.pl.x,y:this.pl.y,duration:500,onComplete:()=>{
+      this.say(['やった！ ペロッパを捕まえた！'],()=>{this.state='zukan';this.zk.setVisible(true);});
+    }});
+  }
+
+  // ===== HUD・描画 =====
+  drawWax(time){
+    const g=this.waxG;g.clear();
+    const draw=(x,y,a)=>{
+      g.fillStyle(0xfff0a0,a);g.fillRect(x*T,y*T,T,T);
+      const ph=(time/450+x*1.3+y*2.1)%3;
+      if(ph<1){g.fillStyle(0xffffff,1-ph);g.fillRect(x*T+6+(x*7)%16,y*T+5+(y*5)%16,4,4);}
+    };
+    this.wax.forEach(k=>{const[x,y]=k.split(',').map(Number);draw(x,y,0.7);});
+    this.trails.forEach((e,k)=>{if(e<=this.clock||this.wax.has(k))return;const[x,y]=k.split(',').map(Number);draw(x,y,Math.min(0.7,(e-this.clock)/2));});
+    this.sources.forEach(k=>{
+      const[x,y]=k.split(',').map(Number),s=Math.sin(time/300+x)*1.5;
+      g.fillStyle(0x262241,1);g.fillCircle(cx(x),cx(y),12+s);
+      g.fillStyle(0xf2b01e,1);g.fillCircle(cx(x),cx(y),10+s);
+      g.fillStyle(0xffe36e,1);g.fillCircle(cx(x)-3,cx(y)-3,4);
+    });
+  }
+  hud(){
+    const f=this.f;let s;
+    if(this.phase==='done')s='ペロッパを捕まえた！';
+    else if(this.phase==='boss')s='壁にぶつけて目を回させ、網で捕まえろ！';
+    else if(f.hasMop)s='ワックスだまりを拭き取ろう（あと'+this.sources.size+'）';
+    else if(f.heardA||f.heardB)s='物置でモップを探そう';
+    else s='町の人に話を聞いてみよう';
+    this.hudL.setText(s);
+    let r='♥'.repeat(Math.max(0,this.hearts))+'♡'.repeat(3-Math.max(0,this.hearts));
+    if(this.phase==='town'&&f.hasMop)r+='　モップ '+'■'.repeat(this.mop)+'□'.repeat(MOP_MAX-this.mop);
+    if(this.boss&&this.phase==='boss')r+='　捕獲 '+'●'.repeat(3-this.boss.hp)+'○'.repeat(this.boss.hp);
+    this.hudR.setText(r);
+  }
+  pressed(name,key){const t=TOUCH[name]&&!this.prevT[name];this.prevT[name]=TOUCH[name];return Phaser.Input.Keyboard.JustDown(key)||t;}
+
+  update(time,delta){
+    const dt=Math.min(delta,50)/1000;
+    const zk=this.pressed('z',this.keys.z),sp=Phaser.Input.Keyboard.JustDown(this.cur.space),en=Phaser.Input.Keyboard.JustDown(this.keys.enter);
+    const z=zk||sp||en,x=this.pressed('x',this.keys.x),c=this.pressed('c',this.keys.c),r=this.pressed('r',this.keys.r);
+    this.drawWax(time);this.hud();
+    this.faceDot.setPosition(this.pl.x+this.facing.x*15,this.pl.y+this.facing.y*15);
+    if(this.state==='dialog')return this.updateDialog(dt,z);
+    if(this.state==='zukan'){if(z)this.scene.restart({});return;}
+
+    this.clock+=dt;
+    if(this.inv>0){this.inv-=dt;this.pl.setAlpha(Math.floor(this.inv*12)%2?0.3:1);}else this.pl.setAlpha(1);
+    this.updateSpits(dt);this.updateBoss(dt);
+    if(this.state!=='explore'||this.busy)return;
+
+    if(z)return this.interact();
+    if(x)return this.wipe();
+    if(c)return this.swing();
+    if(r&&this.phase==='town')return this.resetRoom();
+
+    let name=null;
+    if(this.cur.up.isDown||this.wasd.W.isDown||TOUCH.up)name='up';
+    else if(this.cur.down.isDown||this.wasd.S.isDown||TOUCH.down)name='down';
+    else if(this.cur.left.isDown||this.wasd.A.isDown||TOUCH.left)name='left';
+    else if(this.cur.right.isDown||this.wasd.D.isDown||TOUCH.right)name='right';
+    if(!name){this.hold=null;return;}
+    const d=DIRS[name];
+    if(this.hold!==name){this.hold=name;this.holdT=0;this.wait=(this.facing!==d);this.facing=d;}
+    this.holdT+=dt;
+    if(this.wait&&this.holdT<0.12)return;
+    this.tryMove(d);
+  }
+}
+
+const config={type:Phaser.AUTO,parent:'game',width:640,height:480,backgroundColor:'#262241',pixelArt:true,
+  scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},scene:[MainScene]};
+const fontReady=document.fonts?Promise.race([document.fonts.load('16px "DotGothic16"'),new Promise(r=>setTimeout(r,1500))]):Promise.resolve();
+fontReady.catch(()=>{}).then(()=>new Phaser.Game(config));
+
+</script>
+</body>
+</html>

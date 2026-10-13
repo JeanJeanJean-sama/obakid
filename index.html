@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>オバキッド捕獲作戦 開発記録</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e9e7f6; --ink:#262241; --sub:#5a5680; --accent:#ff5f9e; --wax:#ffe36e; --panel:#ffffff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#1b1930; --ink:#ecebf7; --sub:#a9a5cf; --panel:#2a2747; }
+}
+:root[data-theme="dark"]{ --bg:#1b1930; --ink:#ecebf7; --sub:#a9a5cf; --panel:#2a2747; }
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"DotGothic16","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;line-height:1.7}
+main{max-width:760px;margin:0 auto;padding:32px 16px 48px}
+h1{font-size:clamp(1.6rem,5vw,2.4rem);font-weight:normal;margin:0 0 4px;letter-spacing:.04em}
+.lead{color:var(--sub);margin:0 0 32px}
+h2{font-size:1.2rem;font-weight:normal;margin:40px 0 12px}
+.play{display:block;text-decoration:none;color:var(--ink);background:var(--panel);border:4px solid var(--ink);border-radius:14px;padding:16px 20px;box-shadow:6px 6px 0 var(--accent);margin-bottom:20px}
+.play:hover,.play:focus-visible{background:var(--wax)}
+.play:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+.play strong{font-weight:normal;font-size:1.25rem;display:block}
+.play span{color:var(--sub);font-size:.95rem}
+.old{display:block;color:var(--ink);background:transparent;border:3px dashed var(--sub);border-radius:14px;padding:12px 20px;text-decoration:none;margin-bottom:12px}
+.old:hover,.old:focus-visible{border-style:solid}
+.log{border-left:4px solid var(--wax);padding-left:16px;margin:0 0 24px}
+.log h3{font-size:1rem;font-weight:normal;margin:0 0 4px}
+.log p{margin:0 0 8px}
+.note{color:var(--sub);font-size:.85rem;margin-top:40px}
+</style>
+</head>
+<body>
+<main>
+  <h1>オバキッド捕獲作戦</h1>
+  <p class="lead">マンホールにひそむオバキッドを、知恵と道具で捕まえるゲーム。v1.0.0 の完成をめざして開発中です。その制作過程を、版ごとに残しています。</p>
+
+  <a class="play" href="v0.2/"><strong>最新版（v0.2.0）であそぶ</strong><span>ツルツル床のパズルを解いて、突進するペロッパを網で捕まえる</span></a>
+
+  <h2>過去の版</h2>
+  <a class="old" href="v0.1/">v0.1.0　最初の試作版</a>
+
+  <h2>開発日記</h2>
+  <div class="log">
+    <h3>v0.2.0　パズルとアクションを強化</h3>
+    <p>移動をマス目単位にして、ゼルダの氷の床のようなパズルにした。ワックスの上では止まれず、乾いた床か障害物で止まる。モップは4回しか使えないので、どこを拭いて止まり場所を作るか、木箱をどこへ滑らせるかを考える必要がある。解けることはプログラムの総当たりで確認した。</p>
+    <p>ハート制のライフを追加。水路に落ちる、ペロッパの飛ばすワックスに当たる、突進を受けるとハートが減る。捕獲はタイミングバーをやめて、突進を壁にぶつけて目を回したところを虫取り網で捕まえるボス戦にした。</p>
+  </div>
+  <div class="log">
+    <h3>v0.1.0　最初の試作版</h3>
+    <p>まずは遊びの流れを確かめるための試作。住人の話を聞き、モップを手に入れ、ワックスを拭き取るとペロッパが顔を出す。捕獲は動くバーに合わせてボタンを押すだけの簡単なもの。</p>
+    <p>遊んでみて、拭き取りは作業になりがちで、捕獲も単純すぎると分かった。これがv0.2.0の改良につながった。</p>
+  </div>
+
+  <p class="note">キャラクターや背景は仮の図形です。ファン制作の非公式作品です。</p>
+</main>
+</body>
+</html>
