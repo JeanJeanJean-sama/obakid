@@ -1,0 +1,23 @@
+{
+  "_説明": "イベントシーンの台本。上から順番に実行される。命令の一覧と書き方は docs/event-script.md",
+
+  "peroAppear": [
+    { "do": "stopBgm" },
+    { "do": "say", "text": "events.peroAppear.wiped" },
+    { "do": "sound", "key": "se_rumble" },
+    { "do": "shake", "sec": 0.6, "power": 0.006 },
+    { "do": "say", "text": "events.peroAppear.rumble" },
+    { "do": "call", "name": "dryWax" },
+    { "do": "say", "text": "events.peroAppear.dry" },
+    { "do": "say", "text": "events.peroAppear.cry" },
+    { "do": "walk", "who": "takeru", "to": [7, 10] },
+    { "do": "say", "text": "events.peroAppear.takeruCall" },
+    { "do": "call", "name": "giveNet" },
+    { "do": "sound", "key": "se_item" },
+    { "do": "say", "text": "events.peroAppear.getNet" },
+    { "do": "walk", "who": "takeru", "to": [3, 10] },
+    { "do": "face", "who": "takeru", "dir": "down" },
+    { "do": "bgm", "key": "bgm_boss" },
+    { "do": "call", "name": "spawnBoss" }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "_説明": "画像と音のファイルの一覧。file の場所にファイルを置くと、それが使われる。無いときは、画像は仮の図形、音は鳴らさない。くわしくは docs/asset-list.md",
+
+  "images": [
+    { "key": "tile_floor", "file": "assets/images/tile_floor.png", "width": 32, "height": 32, "_説明": "床" },
+    { "key": "tile_wall",  "file": "assets/images/tile_wall.png",  "width": 32, "height": 32, "_説明": "壁" },
+    { "key": "tile_shed",  "file": "assets/images/tile_shed.png",  "width": 32, "height": 32, "_説明": "物置（2×2マスに同じ絵が並ぶ）" },
+    { "key": "tile_sign",  "file": "assets/images/tile_sign.png",  "width": 32, "height": 32, "_説明": "看板（床の上に立っている絵）" },
+    { "key": "tile_tree",  "file": "assets/images/tile_tree.png",  "width": 32, "height": 32, "_説明": "木（床の上に立っている絵）" },
+    { "key": "tile_canal", "file": "assets/images/tile_canal.png", "width": 32, "height": 32, "_説明": "水路" },
+    { "key": "manhole",    "file": "assets/images/manhole.png",    "width": 32, "height": 32, "_説明": "マンホールのフタ（背景は透明に）" },
+    { "key": "crate",      "file": "assets/images/crate.png",      "width": 32, "height": 32, "_説明": "木箱（背景は透明に）" },
+    { "key": "mop",        "file": "assets/images/mop.png",        "width": 20, "height": 10, "_説明": "モップ（拭くときに出る）" },
+    { "key": "net",        "file": "assets/images/net.png",        "width": 30, "height": 14, "_説明": "虫取り網（左端が持ち手。右向きに描く）" },
+    { "key": "dot",        "file": "assets/images/dot.png",        "width": 6,  "height": 6,  "_説明": "向きを示す点" },
+    { "key": "blob",       "file": "assets/images/blob.png",       "width": 14, "height": 14, "_説明": "ペロッパが飛ばすワックスの塊" }
+  ],
+
+  "spritesheets": [
+    { "key": "player", "file": "assets/images/player.png", "frameWidth": 32, "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"], "framesPerDirection": 1, "walkFps": 8, "_説明": "主人公" },
+    { "key": "hana", "file": "assets/images/hana.png", "frameWidth": 32, "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"], "framesPerDirection": 1, "walkFps": 8, "_説明": "ハナさん" },
+    { "key": "takeru", "file": "assets/images/takeru.png", "frameWidth": 32, "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"], "framesPerDirection": 1, "walkFps": 8, "_説明": "タケル" },
+    { "key": "pero", "file": "assets/images/pero.png", "frameWidth": 32, "frameHeight": 32,
+      "directions": ["down"], "framesPerDirection": 1, "walkFps": 8, "_説明": "ペロッパ" }
+  ],
+
+  "audio": [
+    { "key": "bgm_plaza", "file": "assets/audio/bgm_plaza.mp3", "volume": 0.5, "_説明": "広場のBGM（くり返し）" },
+    { "key": "bgm_boss",  "file": "assets/audio/bgm_boss.mp3",  "volume": 0.5, "_説明": "ペロッパとの勝負のBGM（くり返し）" },
+    { "key": "me_zukan",  "file": "assets/audio/me_zukan.mp3",  "volume": 0.7, "_説明": "図鑑に登録されたときの短い曲" },
+    { "key": "se_text",   "file": "assets/audio/se_text.mp3",   "volume": 0.3, "_説明": "会話の文字送り" },
+    { "key": "se_item",   "file": "assets/audio/se_item.mp3",   "volume": 0.8, "_説明": "道具を手に入れた" },
+    { "key": "se_wipe",   "file": "assets/audio/se_wipe.mp3",   "volume": 0.8, "_説明": "モップで拭く" },
+    { "key": "se_slide",  "file": "assets/audio/se_slide.mp3",  "volume": 0.8, "_説明": "ワックスで滑り出す" },
+    { "key": "se_bump",   "file": "assets/audio/se_bump.mp3",   "volume": 0.8, "_説明": "滑って何かにぶつかる" },
+    { "key": "se_fall",   "file": "assets/audio/se_fall.mp3",   "volume": 0.8, "_説明": "水路に落ちる" },
+    { "key": "se_crate",  "file": "assets/audio/se_crate.mp3",  "volume": 0.8, "_説明": "木箱を押す" },
+    { "key": "se_damage", "file": "assets/audio/se_damage.mp3", "volume": 0.8, "_説明": "ハートが減る" },
+    { "key": "se_spit",   "file": "assets/audio/se_spit.mp3",   "volume": 0.6, "_説明": "ペロッパがワックスを飛ばす" },
+    { "key": "se_splat",  "file": "assets/audio/se_splat.mp3",  "volume": 0.6, "_説明": "ワックスの塊が落ちる" },
+    { "key": "se_rumble", "file": "assets/audio/se_rumble.mp3", "volume": 0.8, "_説明": "マンホールが揺れる" },
+    { "key": "se_dash",   "file": "assets/audio/se_dash.mp3",   "volume": 0.8, "_説明": "ペロッパの突進" },
+    { "key": "se_dizzy",  "file": "assets/audio/se_dizzy.mp3",  "volume": 0.8, "_説明": "ペロッパが壁にぶつかって目を回す" },
+    { "key": "se_net",    "file": "assets/audio/se_net.mp3",    "volume": 0.8, "_説明": "網を振る" },
+    { "key": "se_net_hit","file": "assets/audio/se_net_hit.mp3","volume": 0.8, "_説明": "網に入ったが抜け出された" },
+    { "key": "se_catch",  "file": "assets/audio/se_catch.mp3",  "volume": 0.9, "_説明": "捕まえた" }
+  ]
+}

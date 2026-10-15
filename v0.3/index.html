@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>オバキッド捕獲作戦 v0.3.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e9e7f6; --ink:#262241; --sub:#5a5680; --accent:#ff5f9e; --wax:#ffe36e; --panel:#ffffff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#1b1930; --ink:#ecebf7; --sub:#a9a5cf; --panel:#2a2747; }
+}
+:root[data-theme="dark"]{ --bg:#1b1930; --ink:#ecebf7; --sub:#a9a5cf; --panel:#2a2747; }
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"DotGothic16","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
+  line-height:1.6;
+}
+main{max-width:960px; margin:0 auto; padding:20px 16px 32px}
+h1{font-size:clamp(1.4rem,4vw,2rem); margin:0 0 4px; font-weight:normal; letter-spacing:.04em}
+.lead{margin:0 0 16px; color:var(--sub); font-size:.95rem}
+#frame{
+  border:4px solid var(--ink); border-radius:14px; overflow:hidden;
+  background:#262241; box-shadow:6px 6px 0 var(--accent);
+}
+#game{width:100%; aspect-ratio:4/3}
+#game canvas{display:block}
+.keys{margin:20px 0 0; display:flex; flex-wrap:wrap; gap:8px 20px; font-size:.95rem}
+kbd{
+  font-family:inherit; background:var(--panel); border:2px solid var(--ink);
+  border-radius:6px; padding:0 6px; margin-right:4px;
+}
+.note{color:var(--sub); font-size:.85rem; margin-top:12px}
+.back{color:var(--ink); font-size:.9rem}
+#pad{display:none; margin-top:16px; justify-content:space-between; align-items:center; user-select:none; -webkit-user-select:none; touch-action:none}
+.dpad{display:grid; grid-template-columns:repeat(3,56px); grid-template-rows:repeat(3,56px); gap:4px}
+.btn{
+  background:var(--panel); color:var(--ink); border:3px solid var(--ink); border-radius:12px;
+  font-family:inherit; font-size:1.1rem; display:flex; align-items:center; justify-content:center;
+  touch-action:none;
+}
+.btn.on{background:var(--wax)}
+.acts{display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end}
+.acts .btn{width:64px; height:64px; border-radius:50%}
+@media (pointer:coarse){ #pad{display:flex} .keys{display:none} }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../">← 版の一覧へ</a>
+  <h1>オバキッド捕獲作戦</h1>
+  <p class="lead">v0.3.0　ワックスの謎を解いて、ペロッパを捕まえよう</p>
+  <div id="frame"><div id="game"></div></div>
+
+  <div id="pad">
+    <div class="dpad">
+      <span></span><button class="btn" data-k="up" aria-label="上">▲</button><span></span>
+      <button class="btn" data-k="left" aria-label="左">◀</button><span></span><button class="btn" data-k="right" aria-label="右">▶</button>
+      <span></span><button class="btn" data-k="down" aria-label="下">▼</button><span></span>
+    </div>
+    <div class="acts">
+      <button class="btn" data-k="r" style="width:52px;height:52px;font-size:.8rem">戻す</button>
+      <button class="btn" data-k="x">拭く</button>
+      <button class="btn" data-k="c">網</button>
+      <button class="btn" data-k="z">調べる</button>
+    </div>
+  </div>
+
+  <div class="keys">
+    <span><kbd>←↑↓→</kbd>または<kbd>WASD</kbd>移動</span>
+    <span><kbd>Z</kbd>または<kbd>Space</kbd>話す・調べる・決定</span>
+    <span><kbd>X</kbd>モップで拭く</span>
+    <span><kbd>C</kbd>虫取り網を振る</span>
+    <span><kbd>R</kbd>広場をやり直す</span>
+  </div>
+  <p class="note">キャラクターや背景は仮の図形です。作者のドット絵ができたものから順に差し替えていきます。</p>
+</main>
+
+
+<!-- ゲームエンジン Phaser（全版共通。lib フォルダから読み込む） -->
+<script src="../lib/phaser.min.js"></script>
+<!-- ゲームのプログラム（js フォルダ）。main.js から順に読み込まれる -->
+<script type="module" src="js/main.js"></script>
+<script>
+// ファイルをダブルクリックで開いた（file://）ときは動かないので、説明を出す
+if (location.protocol === 'file:') {
+  document.getElementById('game').innerHTML =
+    '<p style="color:#fff;padding:24px;line-height:1.8">このゲームは、ローカルサーバーを通して開く必要があります。<br>README.md の「手元で遊ぶ」を見てください。</p>';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+{
+  "_説明": "ゲームの調整用の数値。秒は sec、ミリ秒（1000分の1秒）は ms。くわしくは docs/data-guide.md",
+
+  "player": {
+    "hearts": 3,
+    "invincibleSec": 1.2,
+    "walkMs": 130,
+    "slideMs": 60,
+    "turnHoldSec": 0.12,
+    "showFacingDot": true,
+    "_説明": "hearts：ハートの数 / invincibleSec：ダメージ後に無敵になる時間 / walkMs：1マス歩く時間 / slideMs：1マス滑る時間 / turnHoldSec：これより短く押すと向きだけ変わる / showFacingDot：向きを示す黄色い点を出すか"
+  },
+
+  "mop": {
+    "uses": 4,
+    "_説明": "モップを使える回数。変えたらパズル検証をやり直すこと"
+  },
+
+  "dialog": {
+    "charsPerSec": 45,
+    "blipEvery": 2,
+    "_説明": "charsPerSec：1秒に出る文字数 / blipEvery：何文字ごとに文字送りの音を鳴らすか"
+  },
+
+  "spit": {
+    "intervalSec": 4.5,
+    "flightSec": 1.1,
+    "arcHeight": 90,
+    "_説明": "ペロッパが飛ばすワックス。intervalSec：飛ばす間隔 / flightSec：落ちるまでの時間 / arcHeight：山なりの高さ（ピクセル）"
+  },
+
+  "boss": {
+    "hp": 3,
+    "chaseChance": 0.6,
+    "trailSec": 6,
+    "minDashDistance": 2,
+    "dashStepSec": 0.05,
+    "escapeMinDistance": 4,
+    "telegraphSec": { "start": 0.75, "perLevel": -0.15, "min": 0.35 },
+    "wanderStepSec": { "start": 0.45, "perLevel": -0.08, "min": 0.22 },
+    "dizzySec": { "start": 2.6, "perLevel": -0.3, "min": 1.6 },
+    "cooldownSec": { "first": 1.5, "afterHitPlayer": 1.8, "afterDizzy": 1.2, "afterEscape": 1.0 },
+    "_説明": "ペロッパとの勝負。hp：捕まえるのに必要な回数 / chaseChance：主人公にそろいに来る確率（0〜1） / trailSec：通った跡のワックスが残る時間 / minDashDistance：何マス以上離れていたら突進するか / dashStepSec：突進で1マス進む時間 / escapeMinDistance：網から逃げたとき主人公から何マス以上離れた所へ行くか / telegraphSec：突進前の予告時間 / wanderStepSec：うろうろ歩く間隔 / dizzySec：目を回している時間 / cooldownSec：次に突進できるまでの待ち時間。start・perLevel・min がある数値は「最初の値＋捕まえた回数×perLevel、ただし min より小さくならない」"
+  }
+}

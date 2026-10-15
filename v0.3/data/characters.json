@@ -1,0 +1,7 @@
+{
+  "_説明": "キャラクターの名前と、使う画像の名前（assets.json の key）。name を変えると、セリフの中の {hana} などもまとめて変わる",
+  "player": { "name": "主人公", "image": "player" },
+  "hana":   { "name": "ハナさん", "image": "hana" },
+  "takeru": { "name": "タケル", "image": "takeru" },
+  "pero":   { "name": "ペロッパ", "image": "pero" }
+}

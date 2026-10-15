@@ -35,6 +35,7 @@ h2{font-size:1.2rem;font-weight:normal;margin:40px 0 12px}
 .log h3{font-size:1rem;font-weight:normal;margin:0 0 4px}
 .log p{margin:0 0 8px}
 .note{color:var(--sub);font-size:.85rem;margin-top:40px}
+.log code{font-family:inherit;background:var(--panel);border-radius:4px;padding:0 4px}
 </style>
 </head>
 <body>
@@ -42,12 +43,18 @@ h2{font-size:1.2rem;font-weight:normal;margin:40px 0 12px}
   <h1>オバキッド捕獲作戦</h1>
   <p class="lead">マンホールにひそむオバキッドを、知恵と道具で捕まえるゲーム。v1.0.0 の完成をめざして開発中です。その制作過程を、版ごとに残しています。</p>
 
-  <a class="play" href="v0.2/"><strong>最新版（v0.2.0）であそぶ</strong><span>ツルツル床のパズルを解いて、突進するペロッパを網で捕まえる</span></a>
+  <a class="play" href="v0.3/"><strong>最新版（v0.3.0）であそぶ</strong><span>ツルツル床のパズルを解いて、突進するペロッパを網で捕まえる</span></a>
 
   <h2>過去の版</h2>
+  <a class="old" href="v0.2/">v0.2.0　パズルとアクションを強化</a>
   <a class="old" href="v0.1/">v0.1.0　最初の試作版</a>
 
   <h2>開発日記</h2>
+  <div class="log">
+    <h3>v0.3.0　絵と音を入れるための土台づくり</h3>
+    <p>遊んだときの見た目と内容は v0.2.0 とほぼ同じ。そのかわり中身を大きく作り替えて、プログラムを触らずに絵・音・セリフを差し替えられるようにした。決まった名前のドット絵を <code>assets/images</code> に置けば、その絵だけが仮の図形から入れ替わる。描けたものから1枚ずつ差し替えていける。</p>
+    <p>セリフやキャラの名前は <code>data/dialog.json</code> と <code>data/characters.json</code>、モップの回数やペロッパの速さは <code>data/settings.json</code> にまとめた。ペロッパ登場の場面は「台本」で動かすようにしていて、タケルが網を渡しに走ってくる。BGM と効果音を鳴らす仕組みも入れたけれど、音はまだ作っていないので今は静か。パズルは新しい検証プログラムで総当たりして、今までどおり4回ちょうどで解けることを確かめた。</p>
+  </div>
   <div class="log">
     <h3>v0.2.0　パズルとアクションを強化</h3>
     <p>移動をマス目単位にして、ゼルダの氷の床のようなパズルにした。ワックスの上では止まれず、乾いた床か障害物で止まる。モップは4回しか使えないので、どこを拭いて止まり場所を作るか、木箱をどこへ滑らせるかを考える必要がある。解けることはプログラムの総当たりで確認した。</p>
