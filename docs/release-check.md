@@ -27,7 +27,7 @@ Claude Code に「docs/release-check.md の手順で確認して」と頼んで�
 PowerShell で、このフォルダ（`obakid`）に移動してから、次の2つを順に貼り付けて実行します。
 
 ```
-cd C:\sagyou\OBA\obakid
+cd C:\GitHub\obakid
 ```
 
 **(1) ファイルの中身を検索する**

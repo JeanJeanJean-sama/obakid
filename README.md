@@ -25,6 +25,7 @@ v0.3/               v0.3.0（最新版）
   assets/images/      画像（ドット絵を置く）
   assets/audio/       BGM と効果音
   tools/              パズル検証プログラム
+art/                絵の作業ファイル（GitHub には上げない）
 lib/                ゲームエンジン Phaser 3.80.1 とそのライセンス（全版共通）
 CHANGELOG.md        変更履歴
 docs/
@@ -35,6 +36,7 @@ docs/
   event-script.md     イベントの台本の書き方
   release-check.md    公開前のネタバレ確認の手順
   plan-v0.3-publish.md  公開準備の作業メモ
+  plan-v0.3-newpc.md  新しいPCでの作業環境の作業メモ
 .nojekyll           GitHub Pages に余計な変換をさせないための空ファイル
 .gitignore          GitHub に上げないファイルの設定
 ```
@@ -61,7 +63,7 @@ v0.3 からは、画像やデータを別のファイルから読み込みます
 
 1. PowerShell を開き、次のコマンドを貼り付けて Enter（フォルダの場所は自分の環境に合わせる）
    ```
-   python -m http.server 8000 --bind 127.0.0.1 --directory C:\sagyou\OBA\obakid
+   python -m http.server 8000 --bind 127.0.0.1 --directory C:\GitHub\obakid
    ```
 2. ブラウザで `http://127.0.0.1:8000/` を開く
 3. 終わるときは、PowerShell の画面で Ctrl + C を押す
@@ -85,7 +87,7 @@ Node.js（https://nodejs.org/ の LTS 版）が必要です。
 
 1. PowerShell で、このフォルダ（`obakid`）に移動する
    ```
-   cd C:\sagyou\OBA\obakid
+   cd C:\GitHub\obakid
    ```
 2. 次のコマンドを実行する
    ```
